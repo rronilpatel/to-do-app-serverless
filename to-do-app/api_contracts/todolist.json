@@ -1,0 +1,28 @@
+{
+    "id": "7a40e290-913e-4a2c-9b57-c88c9d2c0a53",
+    "user_id": "4a302c1d-2e5d-11ee-949d-4551c1e4c1b2",
+    "user": {
+        "id": "4a302c1d-2e5d-11ee-949d-4551c1e4c1b2",
+        "name": "Tapan Patel",
+        "email": "tapan.patel@dal.ca",
+        "password": "123456789"
+    },
+    "tasks": [
+        {
+            "title": "To go for Driving Test lesson",
+            "description": "asdk alsdjflajsdf  alsdjf lasjdlfjasldjf ",
+            "date": "2023-07-30",
+            "time": "03:00:00",
+            "priority": "urgent",
+            "status": "incomplete"
+        },
+        {
+            "title": "Shift at Dalplex closing",
+            "description": "asdk alsdjflajsdf  alsdjf lasjdlfjasldjf ",
+            "date": "2023-07-31",
+            "time": "17:30:00",
+            "priority": "normal",
+            "status": "complete"
+        }
+    ]
+}

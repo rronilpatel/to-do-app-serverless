@@ -1,0 +1,546 @@
+AWSTemplateFormatVersion: 2010-09-09
+Parameters:
+  SnsTopic:
+    Description: Name of SNS Topic
+    Type: String
+    Default: test-todo-list-deadline-scheduler
+  DynamoDbUser:
+    Description: Name of To do User Table
+    Type: String
+    Default: TestToDoUserTable
+  DynamoDbTask:
+    Description: Name of To do Task Table
+    Type: String
+    Default: TestToDoTaskTable
+
+Resources:
+# ===================== Dynamo DB Resource =========================
+
+# ---------------------- User Table --------------------------------
+  ToDoUserTable:
+    Type: "AWS::DynamoDB::Table"
+    Properties:
+      TableName:
+        Ref: DynamoDbUser
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      ProvisionedThroughput:
+        ReadCapacityUnits: "5"
+        WriteCapacityUnits: "5"
+
+# ---------------------- Task Table --------------------------------
+  ToDoTaskTable:
+    Type: "AWS::DynamoDB::Table"
+    Properties:
+      TableName:
+        Ref: DynamoDbTask
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      ProvisionedThroughput:
+        ReadCapacityUnits: "5"
+        WriteCapacityUnits: "5"
+    
+# ========================= Lambda Resources ============================
+  ToDoLogin:
+    Type: "AWS::Lambda::Function"
+    Properties:
+      Code:
+        S3Bucket: cloudformationlambda
+        S3Key: test-login-todo.zip
+      Environment:
+        Variables:
+          userTableName: !Sub "${DynamoDbUser}"
+          snsTopicName: !Sub "${SnsTopic}"
+      FunctionName: TestLoginToDo
+      Role: arn:aws:iam::185988496892:role/LabRole
+      Handler: login.lambda_handler
+      Runtime: python3.9
+
+  ToDoSignup:
+    Type: "AWS::Lambda::Function"
+    Properties:
+      Code:
+        S3Bucket: cloudformationlambda
+        S3Key: test-signup-todo.zip
+      Environment:
+        Variables:
+          userTableName: !Sub "${DynamoDbUser}"
+      FunctionName: TestSignupToDo
+      Role: arn:aws:iam::185988496892:role/LabRole
+      Handler: signup.lambda_handler
+      Runtime: python3.9
+
+  ToDoCreateTask:
+    Type: "AWS::Lambda::Function"
+    Properties:
+      Code:
+        S3Bucket: cloudformationlambda
+        S3Key: test-create-task-todo.zip
+      Environment:
+        Variables:
+          taskTableName: !Sub "${DynamoDbTask}"
+      FunctionName: TestCreateTaskToDo
+      Role: arn:aws:iam::185988496892:role/LabRole
+      Handler: createtask.lambda_handler
+      Runtime: python3.9
+
+  ToDoGetTask:
+    Type: "AWS::Lambda::Function"
+    Properties:
+      Code:
+        S3Bucket: cloudformationlambda
+        S3Key: test-get-task-todo.zip
+      Environment:
+        Variables:
+          taskTableName: !Sub '${DynamoDbTask}'
+      FunctionName: TestGetTaskToDo
+      Role: arn:aws:iam::185988496892:role/LabRole
+      Handler: gettask.lambda_handler
+      Runtime: python3.9
+
+  ToDoDeleteTask:
+    Type: "AWS::Lambda::Function"
+    Properties:
+      Code:
+        S3Bucket: cloudformationlambda
+        S3Key: test-delete-task-todo.zip
+      Environment:
+        Variables:
+          taskTableName: !Sub '${DynamoDbTask}'
+      FunctionName: TestDeleteTaskToDo
+      Role: arn:aws:iam::185988496892:role/LabRole
+      Handler: deletetask.lambda_handler
+      Runtime: python3.9
+
+  ToDoCompleteTask:
+    Type: "AWS::Lambda::Function"
+    Properties:
+      Code:
+        S3Bucket: cloudformationlambda
+        S3Key: test-complete-task-todo.zip
+      Environment:
+        Variables:
+          taskTableName: !Sub '${DynamoDbTask}'
+      FunctionName: TestCompleteTaskToDo
+      Role: arn:aws:iam::185988496892:role/LabRole
+      Handler: markascomplete.lambda_handler
+      Runtime: python3.9
+# ========================= API Gateway Resources =======================
+
+# -------------------------- Create Task API ----------------------------
+  TaskCreateAPI:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: TestTaskCreateApi
+    DependsOn:
+      - ToDoCreateTask
+      - ToDoLogin
+      - ToDoSignup
+
+  CreateTaskAPIResource:
+    Type: "AWS::ApiGateway::Resource"
+    Properties:
+      RestApiId: !Ref TaskCreateAPI
+      ParentId: !GetAtt
+        - TaskCreateAPI
+        - RootResourceId
+      PathPart: task
+    DependsOn:
+      - TaskCreateAPI
+  
+  CreateTaskAPIMethod:
+    Type: "AWS::ApiGateway::Method"
+    Properties:
+      RestApiId: !Ref TaskCreateAPI
+      ResourceId: !Ref CreateTaskAPIResource
+      HttpMethod: POST
+      AuthorizationType: NONE
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: false
+            method.response.header.Access-Control-Allow-Methods: false
+            method.response.header.Access-Control-Allow-Origin: "'*'"
+          ResponseModels:
+            application/json: "Empty"
+      Integration:
+        Type: AWS
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'*'"
+              method.response.header.Access-Control-Allow-Methods: "'OPTIONS,POST'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+        IntegrationHttpMethod: POST
+        Uri: !Sub
+          - >-
+            arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaFuncNameArn}/invocations
+          - LambdaFuncNameArn: !GetAtt ToDoCreateTask.Arn
+    DependsOn:
+      - CreateTaskAPIResource
+
+  CreateTaskAPIGatewayDeployment:
+      Type: 'AWS::ApiGateway::Deployment'
+      Properties:
+        RestApiId: !Ref TaskCreateAPI
+        StageName: dev
+      DependsOn:
+        - CreateTaskAPIMethod
+
+  APIGatewayPermissionCreate:
+    Type: 'AWS::Lambda::Permission'
+    Properties:
+      Action: 'lambda:InvokeFunction'
+      FunctionName: !GetAtt ToDoCreateTask.Arn
+      Principal: apigateway.amazonaws.com
+    DependsOn:
+      - CreateTaskAPIGatewayDeployment
+
+# -------------------------- Login API Resource----------------------------
+  LoginAPIResource:
+    Type: "AWS::ApiGateway::Resource"
+    Properties:
+      RestApiId: !Ref TaskCreateAPI
+      ParentId: !GetAtt
+        - TaskCreateAPI
+        - RootResourceId
+      PathPart: login
+    DependsOn:
+      - APIGatewayPermissionCreate
+  
+  LoginAPIMethod:
+    Type: "AWS::ApiGateway::Method"
+    Properties:
+      RestApiId: !Ref TaskCreateAPI
+      ResourceId: !Ref LoginAPIResource
+      HttpMethod: POST
+      AuthorizationType: NONE
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: false
+            method.response.header.Access-Control-Allow-Methods: false
+            method.response.header.Access-Control-Allow-Origin: "'*'"
+          ResponseModels:
+            application/json: "Empty"
+      Integration:
+        Type: AWS
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'*'"
+              method.response.header.Access-Control-Allow-Methods: "'OPTIONS,POST'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+        IntegrationHttpMethod: POST
+        Uri: !Sub
+          - >-
+            arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaFuncNameArn}/invocations
+          - LambdaFuncNameArn: !GetAtt ToDoLogin.Arn
+    DependsOn:
+      - LoginAPIResource
+
+  LoginAPIGatewayDeployment:
+      Type: 'AWS::ApiGateway::Deployment'
+      Properties:
+        RestApiId: !Ref TaskCreateAPI
+        StageName: dev
+      DependsOn:
+        - LoginAPIMethod
+  
+  APIGatewayPermissionLogin:
+      Type: 'AWS::Lambda::Permission'
+      Properties:
+        Action: 'lambda:InvokeFunction'
+        FunctionName: !GetAtt ToDoLogin.Arn
+        Principal: apigateway.amazonaws.com
+      DependsOn:
+        - LoginAPIGatewayDeployment
+
+# -------------------------- SignUp API Resource----------------------------
+  SignUpAPIResource:
+    Type: "AWS::ApiGateway::Resource"
+    Properties:
+      RestApiId: !Ref TaskCreateAPI
+      ParentId: !GetAtt
+        - TaskCreateAPI
+        - RootResourceId
+      PathPart: signup
+    DependsOn:
+      - APIGatewayPermissionLogin
+
+  SignUpAPIMethod:
+    Type: "AWS::ApiGateway::Method"
+    Properties:
+      RestApiId: !Ref TaskCreateAPI
+      ResourceId: !Ref SignUpAPIResource
+      HttpMethod: POST
+      AuthorizationType: NONE
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: false
+            method.response.header.Access-Control-Allow-Methods: false
+            method.response.header.Access-Control-Allow-Origin: "'*'"
+          ResponseModels:
+            application/json: "Empty"
+      Integration:
+        Type: AWS
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'*'"
+              method.response.header.Access-Control-Allow-Methods: "'OPTIONS,POST'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+        IntegrationHttpMethod: POST
+        Uri: !Sub
+          - >-
+            arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaFuncNameArn}/invocations
+          - LambdaFuncNameArn: !GetAtt ToDoSignup.Arn
+    DependsOn:
+      - SignUpAPIResource
+  
+  SignUpAPIGatewayDeployment:
+      Type: 'AWS::ApiGateway::Deployment'
+      Properties:
+        RestApiId: !Ref TaskCreateAPI
+        StageName: dev
+      DependsOn:
+        - SignUpAPIMethod
+
+  APIGatewayPermissionSignUp:
+    Type: 'AWS::Lambda::Permission'
+    Properties:
+      Action: 'lambda:InvokeFunction'
+      FunctionName: !GetAtt ToDoSignup.Arn
+      Principal: apigateway.amazonaws.com
+    DependsOn:
+      - SignUpAPIGatewayDeployment
+
+# -------------------------- GET user Task HTTP API----------------------------
+  TaskHTTPApiGateway:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: TaskHTTPApi
+      ProtocolType: HTTP
+      CorsConfiguration:
+        AllowOrigins:
+          - "*"
+        AllowMethods:
+          - "*"
+        AllowHeaders:
+          - "*"
+    DependsOn:
+      - ToDoGetTask
+      - ToDoDeleteTask
+      - ToDoCompleteTask
+
+  APIInvokeGetTaskFunctionLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref ToDoGetTask
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${TaskHTTPApiGateway}/*/*/*
+    DependsOn:
+      - TaskHTTPApiGateway
+
+  TaskGatewayGetMethodIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref TaskHTTPApiGateway
+      IntegrationType: AWS_PROXY
+      PayloadFormatVersion: "2.0"
+      IntegrationUri: !Join
+        - ""
+        - - "arn:"
+          - !Ref "AWS::Partition"
+          - ":apigateway:"
+          - !Ref "AWS::Region"
+          - ":lambda:path/2015-03-31/functions/"
+          - !GetAtt ToDoGetTask.Arn
+          - /invocations
+    DependsOn:
+      - TaskHTTPApiGateway
+
+  TaskGatewayGetMethodRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref TaskHTTPApiGateway
+      RouteKey: "GET /task/{user_id}"
+      Target: !Join
+        - /
+        - - integrations
+          - !Ref TaskGatewayGetMethodIntegration
+    DependsOn:
+      - TaskGatewayGetMethodIntegration
+
+# -------------------------- DELETE user Task HTTP API----------------------------
+
+  APIInvokeDeleteTaskFunctionLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref ToDoDeleteTask
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${TaskHTTPApiGateway}/*/*/*
+    DependsOn:
+      - TaskHTTPApiGateway
+
+  TaskGatewayDeleteMethodIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref TaskHTTPApiGateway
+      IntegrationType: AWS_PROXY
+      PayloadFormatVersion: "2.0"
+      IntegrationUri: !Join
+        - ""
+        - - "arn:"
+          - !Ref "AWS::Partition"
+          - ":apigateway:"
+          - !Ref "AWS::Region"
+          - ":lambda:path/2015-03-31/functions/"
+          - !GetAtt ToDoDeleteTask.Arn
+          - /invocations
+    DependsOn:
+      - APIInvokeDeleteTaskFunctionLambdaPermission
+
+  TaskGatewayDeleteMethodRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref TaskHTTPApiGateway
+      RouteKey: "DELETE /task/{task_id}"
+      Target: !Join
+        - /
+        - - integrations
+          - !Ref TaskGatewayDeleteMethodIntegration
+    DependsOn:  
+      - TaskGatewayDeleteMethodIntegration
+
+# -------------------------- User Task COMPLETE HTTP API----------------------------
+
+  APIInvokeCompleteTaskFunctionLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref ToDoCompleteTask
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${TaskHTTPApiGateway}/*/*/*
+    DependsOn:
+      - TaskHTTPApiGateway
+
+  TaskGatewayCompleteMethodIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref TaskHTTPApiGateway
+      IntegrationType: AWS_PROXY
+      PayloadFormatVersion: "2.0"
+      IntegrationUri: !Join
+        - ""
+        - - "arn:"
+          - !Ref "AWS::Partition"
+          - ":apigateway:"
+          - !Ref "AWS::Region"
+          - ":lambda:path/2015-03-31/functions/"
+          - !GetAtt ToDoCompleteTask.Arn
+          - /invocations
+    DependsOn:  
+      - APIInvokeCompleteTaskFunctionLambdaPermission
+
+  TaskGatewayCompleteMethodRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref TaskHTTPApiGateway
+      RouteKey: "GET /task/complete"
+      Target: !Join
+        - /
+        - - integrations
+          - !Ref TaskGatewayCompleteMethodIntegration
+    DependsOn:
+      - TaskGatewayCompleteMethodIntegration
+
+# ========================= Secret Manager Resource =========================
+  MySecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: prod/todoapp/reactjsapp1
+      Description: API Gateway URLs for React JS
+      SecretString: !Sub
+        - |
+          {
+            "CreateTaskAPIEndpoint": "https://${Deployment}.execute-api.us-east-1.amazonaws.com/dev",
+            "HTTPApiTaskEndpoint": "https://${Deployment1}.execute-api.us-east-1.amazonaws.com"
+          }
+        - {
+            Deployment: !Ref TaskCreateAPI,
+            Deployment1: !Ref TaskHTTPApiGateway
+          }
+    DependsOn:
+      - TaskCreateAPI
+      - TaskHTTPApiGateway
+
+
+# ========================= SNS Topic =========================
+  SNSTopic1: 
+      Type: AWS::SNS::Topic
+      Properties: 
+        TopicName: !Sub '${SnsTopic}'
+
+# ========================= EC2 instance Resource =========================
+  ReactJsServer:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: t2.large
+      ImageId: ami-007855ac798b5175e
+      KeyName: "todolist"
+      SecurityGroups:
+      - Ref: InstanceSecurityGroup
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          sudo su
+          apt-get update
+          apt install -y npm
+          sudo apt-get install git
+          git clone https://github.com/ronilpatel/cloud-todo.git
+          cd ../..
+          cd cloud-todo/
+          cd to-do-app
+          npm i
+          npm i axios
+          npm i react-router-dom
+          echo "API Gateway URL: $(Fn::Join ['', ['https://', !Ref ScoreAPI, '.execute-api.', !Ref 'AWS::Region', '.amazonaws.com']])" >> /home/api_gateway_url.txt
+          npm start
+
+  InstanceSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Enable SSH HTTP and HTTPS access via port 22,80,443,3000,3389
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 3000
+          ToPort: 3000
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 5000
+          ToPort: 5000
+          CidrIp: 0.0.0.0/0

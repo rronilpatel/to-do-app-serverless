@@ -1,0 +1,38 @@
+[
+    {
+        "name": "Login",
+        "Lambda": "schedulerLogin",
+        "API type": "REST",
+        "endpoint": "https://6y37iig8fi.execute-api.us-east-1.amazonaws.com/dev/user/login"
+    },
+    {
+        "name": "Signup",
+        "Lambda": "SchedulerSignup",
+        "API type": "REST",
+        "endpoint": "https://6y37iig8fi.execute-api.us-east-1.amazonaws.com/dev/user/register"
+    },
+    {
+        "name": "Create/Edit Task",
+        "Lambda": "createToDoTask",
+        "API type": "REST",
+        "endpoint": "https://i0zuxml940.execute-api.us-east-1.amazonaws.com/dev/task"
+    },
+    {
+        "name": "GET Task of user",
+        "Lambda": "GetToDoTasks",
+        "API type": "HTTP",
+        "endpoint": "https://2krwbmgcvj.execute-api.us-east-1.amazonaws.com/task/<user_id>"
+    },
+    {
+        "name": "Delete Task",
+        "Lambda": "DeleteTask",
+        "API type": "HTTP",
+        "endpoint": "https://2krwbmgcvj.execute-api.us-east-1.amazonaws.com/task/<task_id>"
+    },
+    {
+        "name": "Complete Task",
+        "Lambda": "MarkTaskAsComplete",
+        "API type": "HTTP",
+        "endpoint": "https://2krwbmgcvj.execute-api.us-east-1.amazonaws.com/task/complete"
+    }
+]

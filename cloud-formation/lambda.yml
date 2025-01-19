@@ -1,0 +1,101 @@
+AWSTemplateFormatVersion: 2010-09-09
+Parameters:
+  SnsTopic:
+    Description: Name of SNS Topic
+    Type: String
+    Default: test-todo-list-deadline-scheduler
+  DynamoDbUser:
+    Description: Name of To do User Table
+    Type: String
+    Default: TestToDoUserTable
+  DynamoDbTask:
+    Description: Name of To do User Task
+    Type: String
+    Default: TestToDoTaskTable
+
+Resources:
+
+  ToDoLogin:
+    Type: "AWS::Lambda::Function"
+    Properties:
+      Code:
+        S3Bucket: cloudformationlambda
+        S3Key: test-login-todo.zip
+      Environment:
+        Variables:
+          userTableName: !Sub '${DynamoDbUser}'
+          snsTopicName: !Sub '${SnsTopic}'
+      FunctionName: TestLoginToDo
+      Role: arn:aws:iam::185988496892:role/LabRole
+      Handler: login.lambda_handler
+      Runtime: python3.9
+
+  ToDoSignup:
+    Type: "AWS::Lambda::Function"
+    Properties:
+      Code:
+        S3Bucket: cloudformationlambda
+        S3Key: test-signup-todo.zip
+      Environment:
+        Variables:
+          userTableName: !Sub '${DynamoDbUser}'
+      FunctionName: TestSignupToDo
+      Role: arn:aws:iam::185988496892:role/LabRole
+      Handler: signup.lambda_handler
+      Runtime: python3.9
+
+  ToDoCreateTask:
+    Type: "AWS::Lambda::Function"
+    Properties:
+      Code:
+        S3Bucket: cloudformationlambda
+        S3Key: test-create-task-todo.zip
+      Environment:
+        Variables:
+          taskTableName: !Sub '${DynamoDbTask}'
+      FunctionName: TestCreateTaskToDo
+      Role: arn:aws:iam::185988496892:role/LabRole
+      Handler: createtask.lambda_handler
+      Runtime: python3.9
+
+  ToDoGetTask:
+    Type: "AWS::Lambda::Function"
+    Properties:
+      Code:
+        S3Bucket: cloudformationlambda
+        S3Key: test-get-task-todo.zip
+      Environment:
+        Variables:
+          taskTableName: !Sub '${DynamoDbTask}'
+      FunctionName: TestGetTaskToDo
+      Role: arn:aws:iam::185988496892:role/LabRole
+      Handler: gettask.lambda_handler
+      Runtime: python3.9
+
+  ToDoDeleteTask:
+    Type: "AWS::Lambda::Function"
+    Properties:
+      Code:
+        S3Bucket: cloudformationlambda
+        S3Key: test-delete-task-todo.zip
+      Environment:
+        Variables:
+          taskTableName: !Sub '${DynamoDbTask}'
+      FunctionName: TestDeleteTaskToDo
+      Role: arn:aws:iam::185988496892:role/LabRole
+      Handler: deletetask.lambda_handler
+      Runtime: python3.9
+
+  ToDoCompleteTask:
+    Type: "AWS::Lambda::Function"
+    Properties:
+      Code:
+        S3Bucket: cloudformationlambda
+        S3Key: test-complete-task-todo.zip
+      Environment:
+        Variables:
+          taskTableName: !Sub '${DynamoDbTask}'
+      FunctionName: TestCompleteTaskToDo
+      Role: arn:aws:iam::185988496892:role/LabRole
+      Handler: markascomplete.lambda_handler
+      Runtime: python3.9

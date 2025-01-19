@@ -1,0 +1,11 @@
+AWSTemplateFormatVersion: 2010-09-09
+Parameters:
+  SnsTopic:
+    Description: Name of SNS Topic
+    Type: String
+    Default: test-todo-list-deadline-scheduler
+Resources:
+  SNSTopic1: 
+    Type: AWS::SNS::Topic
+    Properties: 
+      TopicName: !Sub '${SnsTopic}'

@@ -1,0 +1,52 @@
+AWSTemplateFormatVersion: 2010-09-09
+Resources:
+  Server:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: t2.large
+      ImageId: ami-007855ac798b5175e
+      KeyName: "todolist"
+      SecurityGroups:
+      - Ref: InstanceSecurityGroup
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          sudo su
+          apt-get update
+          apt install -y npm
+          sudo apt-get install git
+          git clone https://github.com/ronilpatel/cloud-todo.git
+          cd ../..
+          cd cloud-todo/
+          cd to-do-app
+          npm i
+          npm i axios
+          npm i react-router-dom
+          echo "API Gateway URL: $(Fn::Join ['', ['https://', !Ref ScoreAPI, '.execute-api.', !Ref 'AWS::Region', '.amazonaws.com']])" >> /home/api_gateway_url.txt
+          npm start
+
+  InstanceSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Enable SSH HTTP and HTTPS access via port 22,80,443,3000,3389
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 3000
+          ToPort: 3000
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 5000
+          ToPort: 5000
+          CidrIp: 0.0.0.0/0
